@@ -1,4 +1,4 @@
- My teaching materials for the `ggplot2` lecture in  BIOS14 (Processing and Analysis of Biological Data) at Lund University.
+ My teaching materials for the `ggplot2` lecture in  BIOS14 (now called BIOS15) (Processing and Analysis of Biological Data) at Lund University.
 
 # Dependencies
 - Requires [Quarto v1.6+](https://quarto.org/)
