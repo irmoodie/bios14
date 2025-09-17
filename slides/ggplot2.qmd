@@ -1,0 +1,863 @@
+---
+title: "`ggplot2`"
+subtitle: "A layered grammer of graphics in `R`"
+author: Iain Moodie
+format: 
+  revealjs:
+    incremental: true
+    progress: true
+    theme: simple
+    output-location: fragment
+    fig-align: center
+    fig-responsive: true
+    self-contained: true
+    toc: true
+    toc-depth: 1
+    toc-title: Plan for this morning
+execute:
+  echo: true
+  warning: false
+  eval: true
+knitr: 
+  opts_chunk:
+    fig.align: center
+    fig.width: 5
+    fig.height: 5
+    fig.dpi: 150
+bibliography: lib.bib
+csl: the-american-naturalist.csl
+css: styles.css
+---
+
+## Expectations
+
+- I will try to:
+  - give you a grammer in which you can describe statistical graphics
+  - show how this was used when designing `ggplot2`
+  - walkthrough some examples (not exhaustive)
+  - demonstrate some common pitfalls
+
+## Expectations
+
+- I will not:
+  - tell you what is a good or bad graphic
+  - cover everything in `ggplot2`
+
+## Expectations
+
+- I expect you to:
+  - have attended the previous talk about `tidyverse`
+  - know now what these symbols mean: `|>` or `%>%`
+  - unless it's directly related to a slide, save questions to the end
+
+# Introduction
+
+## 
+```{r}
+#| echo: false
+
+library(palmerpenguins)
+library(tidyverse)
+library(cowplot)
+
+penguin_colours <- c('#ff8301', '#bf5ccb', '#057076')
+names(penguin_colours) <- c('Gentoo', 'Adelie', 'Chinstrap')
+
+penguins |>
+  filter(species == "Adelie") |>
+  ggplot(aes(x = body_mass_g, y = bill_length_mm)) +
+  geom_point(size = 2, alpha = 0.7, colour = penguin_colours[2]) +
+  labs(y = "Bill length (mm)", x = "Body mass (g)") +
+  theme_cowplot()
+
+```
+
+## 
+```{r}
+#| echo: false
+
+penguins |>
+  filter(species == "Gentoo") |>
+  ggplot(aes(x = bill_length_mm)) +
+  geom_histogram(colour = "white", bins = 15, fill = penguin_colours[1]) +
+  labs(x = "Bill length (mm)") +
+  theme_cowplot()
+
+```
+
+## 
+```{r}
+#| echo: false
+penguins |>
+  filter(sex == "male") |>
+  group_by(species) |>
+  summarise(
+    mean_male_body_mass = mean(body_mass_g),
+    ci_lower = mean(body_mass_g) - qt(0.975, df = n() - 1) * sd(body_mass_g) / sqrt(n()),
+    ci_upper = mean(body_mass_g) + qt(0.975, df = n() - 1) * sd(body_mass_g) / sqrt(n())
+  ) |>
+  ggplot(aes(x = species, y = mean_male_body_mass, fill = species)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.2) +
+  scale_fill_manual(values = penguin_colours) +
+  labs(x = "Penguin species", y = "Male body mass (g)") +
+  theme_cowplot() +
+  theme(legend.position = "none")
+
+```
+
+## 
+```{r}
+#| echo: false
+
+penguins |>
+  ggplot(aes(x = body_mass_g, y = bill_length_mm, colour = species)) +
+  geom_point(size = 2, alpha = 0.7) +
+  geom_smooth(method = "lm", aes(fill = species)) +
+  labs(y = "Bill length (mm)", x = "Body mass (g)", colour = "Species", fill = "Species") +
+  scale_colour_manual(values = penguin_colours) +
+  scale_fill_manual(values = penguin_colours) +
+  theme_cowplot() +
+  theme(legend.position = "none")
+
+```
+
+## 
+```{r}
+#| echo: false
+
+library(ggridges)
+
+penguins |>
+  ggplot(aes(y = species, x = flipper_length_mm, fill = species)) +
+  geom_density_ridges() +
+  labs(x = "Flipper length (mm)", y = "Species", colour = "Species", fill = "Species") +
+  scale_colour_manual(values = penguin_colours) +
+  scale_fill_manual(values = penguin_colours) +
+  theme_cowplot() +
+  theme(legend.position = "none")
+
+```
+
+##
+
+```{r}
+#| echo: false
+
+library(ggdist)
+
+penguins |>
+ggplot(aes(x = species, y = body_mass_g, fill = species)) + 
+  ggdist::stat_halfeye(adjust = .5, width = .3, .width = 0, justification = -.3, point_colour = NA) + 
+  geom_boxplot(width = .1, outlier.shape = NA) +
+  ggdist::stat_dots(side = "left", dotsize = .4, justification = 1.1, binwidth = 100, aes(colour = species)) +
+  labs(y = "Body mass (g)", x = "Species", colour = "Species", fill = "Species") +
+  scale_colour_manual(values = penguin_colours) +
+  scale_fill_manual(values = penguin_colours) +
+  theme_cowplot() +
+  theme(legend.position = "none")
+
+```
+
+## What is a (statistical) graphic?
+
+- How can we succinctly describe a graphic?
+- And how can we create the graphic that we have described?
+- One solution: develop a grammer of graphics
+
+## A grammer of graphics
+
+- A grammer is "the fundamental principles or rules of an art or science" (OED Online 1989)
+- Provides the foundation for understanding, describing, and creating graphics
+- Language analogy:
+  - Good grammar is just the first step in creating a good sentence
+
+## The grammer of graphics
+
+:::: {.columns}
+
+::: {.column width="65%"}
+![](grammer.png)
+:::
+
+::: {.column width="35%"}
+- Developed by @wilkinsonGrammarGraphics2013
+- Tweaked and implemented in `R` by @wickhamGgplot2ElegantGraphics2016a
+:::
+
+::::
+
+# How to build a plot
+
+## How to build a plot
+
+<div class="layer-container">
+  <div class="layer scales">Scales</div>
+  <div class="layer geometries">Geometries</div>
+  <div class="layer aesthetics">Aesthetics</div>
+  <div class="layer data">Data</div>
+</div>
+
+## Data
+
+| A | B | C |
+|---|---|---|
+| 1 | 4 | p |
+| 2 | 3 | p |
+| 3 | 2 | q |
+| 4 | 1 | q |
+
+## Data
+
+```{r}
+simple_data <- tribble(
+  ~A, ~B, ~C,
+  1, 4, "p",
+  2, 3, "p",
+  3, 2, "q",
+  4, 1, "q"
+)
+
+simple_data
+```
+
+## Mapping data to aesthetics
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+<div style="text-align: center;">
+
+| A | B | C |
+|---|---|---|
+| 1 | 4 | p |
+| 2 | 3 | p |
+| 3 | 2 | q |
+| 4 | 1 | q |
+
+</div>
+
+:::
+
+::: {.column width="50%"}
+
+<div style="text-align: center;">
+
+| x | y |
+|---|---|
+| 1 | 4 |
+| 2 | 3 |
+| 3 | 2 |
+| 4 | 1 |
+
+</div>
+
+:::
+
+::::
+
+## Mapping data to aesthetics
+
+```{r}
+#| fig-width: 3
+#| fig-height: 3
+
+ggplot(
+  data = simple_data,
+  mapping = aes(x = A, y = B)
+  )
+```
+
+## Geometries
+
+```{r}
+#| fig-width: 3
+#| fig-height: 3
+
+ggplot(
+  data = simple_data,
+  mapping = aes(x = A, y = B)
+  ) +
+  geom_point()
+```
+
+## Geometries
+
+```{r}
+#| fig-width: 3
+#| fig-height: 3
+#| output-location: default
+
+ggplot(
+  data = simple_data,
+  mapping = aes(x = A, y = B)
+  ) +
+  geom_line()
+```
+
+## Scales
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+<div style="text-align: center;">
+
+| A | B | C |
+|---|---|---|
+| 1 | 4 | p |
+| 2 | 3 | p |
+| 3 | 2 | q |
+| 4 | 1 | q |
+
+</div>
+
+:::
+
+::: {.column width="50%"}
+
+<div style="text-align: center;">
+
+| x | y | shape |
+|---|---|-------|
+| 1 | 4 | p |
+| 2 | 3 | p |
+| 3 | 2 | q |
+| 4 | 1 | q |
+
+</div>
+
+:::
+
+::::
+
+## Scales
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+
+ggplot(
+  data = simple_data,
+  mapping = aes(x = A, y = B, shape = C)
+  ) +
+  geom_point(size = 4)
+```
+
+## Scales
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+
+ggplot(
+  data = simple_data,
+  mapping = aes(x = A, y = B, shape = C)
+  ) +
+  geom_point(size = 4) +
+  scale_shape_manual(values = c("p" = 16, "q" = 15))
+```
+
+## How to build a plot
+
+<div class="layer-container">
+  <div class="layer scales">Scales</div>
+  <div class="layer geometries">Geometries</div>
+  <div class="layer aesthetics">Aesthetics</div>
+  <div class="layer data">Data</div>
+</div>
+
+## Data: palmer penguins
+
+![](https://github.com/allisonhorst/palmerpenguins/raw/main/man/figures/lter_penguins.png){fig-align="center"}
+
+## Data: palmer penguins {.smaller}
+
+```{r}
+#| code-overflow: scroll
+glimpse(penguins)
+```
+
+## How to describe a plot
+
+:::: {.columns}
+
+::: {.column width="60%"}
+
+```{r}
+#| echo: false
+#| fig-width: 4
+#| fig-height: 3
+#| 
+penguins |>
+  ggplot(aes(x = body_mass_g, y = bill_length_mm, colour = species)) +
+  geom_point(size = 2, alpha = 0.7) +
+  labs(y = "Bill length (mm)", x = "Body mass (g)", colour = "Species", fill = "Species") +
+  scale_colour_manual(values = penguin_colours) +
+  scale_fill_manual(values = penguin_colours) +
+  theme_cowplot()
+```
+
+:::
+
+::: {.column width="40%"}
+
+- Aesthetic mapping:
+  - x = *body mass*
+  - y = *bill length*
+  - colour = *species*
+- Geometries
+  - points
+- Scales
+  - discrete colour = *species*
+
+
+:::
+
+::::
+
+# `ggplot2` in action
+
+## `ggplot2`
+
+- Layered grammer of graphics
+
+- _**aes**thetic_ values
+  - `aes()`
+- _**geom**etric_ objects
+  - `geom_*()`
+
+## `ggplot2`
+
+:::: {.columns}
+
+::: {.column width="50%"}
+`mapping` & `aes()`
+
+- `x`
+- `y`
+- `fill`
+- `colour`
+- `shape`
+- `size`
+- etc
+
+:::
+
+::: {.column width="50%"}
+`geom_*`
+
+- `geom_point()`
+- `geom_line()`
+- `geom_bar()`
+- `geom_histogram()`
+- `geom_boxplot()`
+- etc
+:::
+
+::::
+
+##
+
+::: {.callout-tip}
+## Installing and loading `ggplot2`
+
+`ggplot2` is installed with the `tidyverse` meta package
+
+```{r, filename="R console"}
+#| eval: false
+install.packages("tidyverse")
+library(tidyverse)
+```
+
+Or you can install on its own:
+
+```{r, filename="R console"}
+#| eval: false
+install.packages("ggplot2")
+library(ggplot2)
+```
+
+:::
+
+##
+
+```{r}
+#| fig-width: 3
+#| fig-height: 3
+ggplot()
+```
+
+##
+
+```{r}
+#| fig-width: 3
+#| fig-height: 3
+#| output-location: default
+ggplot(data = penguins)
+```
+
+##
+
+```{r}
+#| fig-width: 3
+#| fig-height: 3
+ggplot(
+  data = penguins,
+  mapping = aes(x = flipper_length_mm, y = body_mass_g)
+  )
+```
+
+##
+
+```{r}
+#| fig-width: 3
+#| fig-height: 3
+ggplot(
+  data = penguins,
+  mapping = aes(x = flipper_length_mm, y = body_mass_g)
+  ) +
+  geom_point()
+```
+
+##
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+ggplot(
+  data = penguins,
+  mapping = aes(x = flipper_length_mm, y = body_mass_g, colour = species)
+  ) +
+  geom_point()
+```
+
+##
+
+::: {.callout-tip}
+## Two ways to code:
+
+```{r, filename="Long form"}
+#| eval: false
+ggplot(
+  data = penguins,
+  mapping = aes(x = flipper_length_mm, y = body_mass_g, colour = species)
+  ) +
+  geom_point()
+```
+
+\n
+\n
+
+```{r, filename="Condensed form with pipe"}
+#| eval: false
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point()
+```
+
+:::
+
+##
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+penguins |>
+  filter(species != "Gentoo") |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point()
+```
+
+##
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  filter(species == "Adelie") |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point()
+
+```
+
+##
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  filter(flipper_length_mm > 190) |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point()
+
+```
+
+##
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point()
+
+```
+
+## {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point() +
+  scale_colour_manual(values = c(Gentoo = '#ff8301', Adelie = '#bf5ccb', Chinstrap ='#057076'))
+
+```
+
+## {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point() +
+  scale_colour_manual(values = c(Gentoo = '#ff8301', Adelie = '#bf5ccb', Chinstrap ='#057076')) +
+  labs(x  = "Flipper length (mm)", y = "Body mass (g)")
+
+```
+
+## {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point() +
+  scale_colour_manual(values = c(Gentoo = '#ff8301', Adelie = '#bf5ccb', Chinstrap ='#057076')) +
+  labs(x  = "Flipper length (mm)", y = "Body mass (g)") +
+  theme_classic()
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point()
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot() +
+  geom_point(aes(x = flipper_length_mm, y = body_mass_g, colour = species))
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g)) +
+  geom_point(aes(colour = species)) +
+  geom_smooth(method = "lm")
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point()
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point(aes(size = 1))
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point(aes(size = 2))
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point(aes(size = 3))
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point(size = 3)
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point(size = 1)
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point(size = 5)
+
+```
+
+## When and where to use `aes()` {.smaller}
+
+```{r}
+#| fig-width: 4
+#| fig-height: 3
+#| output-location: default
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point(size = 5, alpha = 0.5)
+
+```
+
+## When and where to use `aes()`
+
+- Mapping data: inside `aes()`
+- Not mapping data (just style): outside `aes()`
+
+## Facets
+
+```{r}
+#| fig-width: 9
+#| fig-height: 3
+penguins |>
+  ggplot(aes(x = flipper_length_mm, y = body_mass_g, colour = species)) +
+  geom_point() +
+  facet_wrap(~species)
+
+```
+
+## Export plots with `ggsave()`
+
+```{r, filename="For example"}
+#| eval: false
+ggsave(filename = "my_plot.pdf")
+
+ggsave(filename = "my_plot.png", width = 6, height = 6, units = "cm", dpi = 300)
+```
+
+- by default, will save the last plot made
+- can change `width`, `height`, `dpi`, etc
+
+# 
+
+<div class="layer-container">
+  <div class="layer theme" id="theme-layer">Theme</div>
+  <div class="layer coordinates" id="coordinates-layer">Coordinates</div>
+  <div class="layer statistics" id="statistics-layer">Transformations</div>
+  <div class="layer facets" id="facets-layer">Facets</div>
+  <div class="layer scales">Scales</div>
+  <div class="layer geometries">Geometries</div>
+  <div class="layer aesthetics">Aesthetics</div>
+  <div class="layer data">Data</div>
+</div>
+
+## `ggplot2`
+
+- `aes()` 
+- `geom_*`
+- `scale_*`
+- `facet_*`
+- `theme_*` and `theme()`
+
+## `ggplot2`
+
+- use `|>` or `%>%` with `dplyr` verbs first
+  - `filter()`
+  - `mutate()`
+  - `summarise()`
+- add layers with `+`
+  - layers are plotted in order
+- save your plot with `ggsave()`
+
+# Discussion / questions
+
+## References

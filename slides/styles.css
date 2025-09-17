@@ -1,0 +1,49 @@
+html, body {
+  height: 100%; /* Ensure full height for centering */
+  margin: 0;
+}
+
+.reveal .slides {
+  display: flex;
+  justify-content: center; /* Horizontal centering of slide content */
+  align-items: center; /* Vertical centering of slide content */
+}
+
+.layer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: transparent; /* Transparent background */
+  color: white;
+  justify-content: center;
+  font-family: Arial, sans-serif;
+  padding: 10px; /* Prevent edge clipping */
+  box-sizing: border-box;
+}
+
+.layer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 70%;
+  height: 45px; /* Layer height */
+  margin: 5px 0; /* Reduced spacing for better fit */
+  font-size: 1.3em; /* Adjusted font size */
+  font-weight: bold;
+  border-radius: 5px;
+}
+
+.data { background: #b8b8b8; color: black; }
+.aesthetics { background: #f15b4b; }
+.geometries { background: #61b5f1; }
+.scales { background: #f39233; }
+.facets { background: #d95dcb; }
+.statistics { background: #70b979; }
+.coordinates { background: #e4cd65; }
+.theme { background: #b288d5; }
+
+/* Completely remove arrows/triangles */
+.layer::after {
+  display: none;
+}
